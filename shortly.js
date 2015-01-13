@@ -50,6 +50,7 @@ app.use(express.static(__dirname + '/public'));
 
 app.get('/', restrict,
 function(req, res) {
+  console.log('/ restricted reached');
   res.render('index');
 });
 
@@ -111,35 +112,36 @@ function restrict(req, res, next) {
 }
 
 app.get('/login', function(req, res) {
+  console.log('/login reached');
   res.render('login');
+  res.end();
+  // res.send('hello');
 });
 
 app.post('/login', function(req, res) {
+  console.log('/login POST');
   var username = req.body.username;
   var password = req.body.password;
 
+  new User({username: username}).fetch()
+    .then(function(user) {
+      user.authenticate(password, function(err, authenticated) {
+        if (authenticated) {
+          console.log('User', username, 'authenticated.');
+          req.session.user = username;
+          res.redirect('/');
+        } else {
+          console.log('Invalid password for user', username);
+          res.redirect('/login');
+        }
+      });
+    });
+});
 
-  db.knex('users')
-    .where('username', '=', username)
-    .then(function (result) {
-      if (result[0] && result[0]['username'] === username) {
-        // Hash the provided password with the stored salt and compare
-        bcrypt.hash(password, result[0]['salt'], null, function (err, hash) {
-          if (hash === result[0]['password']) {
-            session.user = username;
-            res.redirect('/');
-          } else {
-            console.log('Invalid password for user', username);
-            res.redirect('/login');
-          }
-        });
-      } else {
-        console.log('Username not found:', username);
-        res.redirect('/login');
-      }
-    }).catch(function () {
+app.get('/signup', function (req, res) {
+  console.log('/signup reached');
+  res.render('signup');
 
-    })
 });
 
 app.post('/signup', function (req, res) {
@@ -148,6 +150,12 @@ app.post('/signup', function (req, res) {
     req.session.user = req.body.username;
     res.redirect('/');
   })
+
+app.get('/logout', function (req, res) {
+  req.session.destroy(function() {
+    res.redirect('/login');
+  });
+});
 
 });
 
@@ -158,8 +166,10 @@ app.post('/signup', function (req, res) {
 /************************************************************/
 
 app.get('/*', function(req, res) {
+  console.log('/* reached');
   new Link({ code: req.params[0] }).fetch().then(function(link) {
     if (!link) {
+      console.log('redirecting to /');
       res.redirect('/');
     } else {
       var click = new Click({

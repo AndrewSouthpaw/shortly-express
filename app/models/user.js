@@ -20,7 +20,18 @@ var User = db.Model.extend({
     this.on('created', function () {
       this.save();
     });
-  }
+  },
+  authenticate: function(password, cb){
+    var self = this;
+    bcrypt.hash(password, self.get('salt'), null, function (err, hash) {
+      if (err) cb('Error hashing password', null);
+      if (self.get('password') === hash) {
+        cb(null, true);
+      } else {
+        cb(null, false);
+      }
+    });
+  },
 });
 
 module.exports = User;
