@@ -150,14 +150,15 @@ app.post('/signup', function (req, res) {
     req.session.user = req.body.username;
     res.redirect('/');
   })
+});
 
 app.get('/logout', function (req, res) {
+  console.log('/logout reached');
   req.session.destroy(function() {
     res.redirect('/login');
   });
 });
 
-});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
@@ -166,7 +167,7 @@ app.get('/logout', function (req, res) {
 /************************************************************/
 
 app.get('/*', function(req, res) {
-  console.log('/* reached');
+  console.log('/* reached for', req.url, 'method', req.method);
   new Link({ code: req.params[0] }).fetch().then(function(link) {
     if (!link) {
       console.log('redirecting to /');
