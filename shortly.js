@@ -125,16 +125,20 @@ app.post('/login', function(req, res) {
 
   new User({username: username}).fetch()
     .then(function(user) {
-      user.authenticate(password, function(err, authenticated) {
-        if (authenticated) {
-          console.log('User', username, 'authenticated.');
-          req.session.user = username;
-          res.redirect('/');
-        } else {
-          console.log('Invalid password for user', username);
-          res.redirect('/login');
-        }
-      });
+      if (user) {
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            req.session.user = username;
+            res.redirect('/');
+          } else {
+            console.log('Invalid password for user', username);
+            res.redirect('/login');
+          }
+        });
+      } else {
+        res.redirect('/login');
+      }
     });
 });
 
@@ -145,11 +149,20 @@ app.get('/signup', function (req, res) {
 });
 
 app.post('/signup', function (req, res) {
-  console.log('creating user',req.body)
-  new User(req.body).save().then(function() {
-    req.session.user = req.body.username;
-    res.redirect('/');
-  })
+  new User({username: req.body.username}).fetch().then(function (user) {
+    if (!user) {
+      new User(req.body).save().then(function() {
+        req.session.user = req.body.username;
+        res.redirect('/');
+      })
+    } else {
+      res.redirect('/signup');
+    }
+  });
+  // new User(req.body).save().then(function() {
+  //   req.session.user = req.body.username;
+  //   res.redirect('/');
+  // })
 });
 
 app.get('/logout', function (req, res) {
