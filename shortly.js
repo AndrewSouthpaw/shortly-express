@@ -87,16 +87,19 @@ passport.serializeUser(function(user, done) {
 
 passport.deserializeUser(function(user, done) {
   console.log('deserializeUser', user);
-  request({
-    method: 'GET',
-    uri: 'https://api.github.com/users/' + user,
-    headers: {
-      'User-Agent': 'Shortly-Express'
-    }
-  }, function (err, res, body) {
-    console.log('deserialize request body', body)
-    done(null, body);
-  });
+
+  done(null, JSON.stringify({login: user}));
+
+  // request({
+  //   method: 'GET',
+  //   uri: 'https://api.github.com/users/' + user,
+  //   headers: {
+  //     'User-Agent': 'Shortly-Express'
+  //   }
+  // }, function (err, res, body) {
+  //   // console.log('deserialize request body', body)
+  //   done(null, body);
+  // });
 
 
   // done(null, user);
@@ -222,8 +225,8 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  console.log('req.user.id', req.user.id);
-  if (req.user.id) {
+  console.log('req.user', req.user);
+  if (req.user) {
     next();
   } else {
     res.redirect('/login');
