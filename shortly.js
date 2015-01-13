@@ -62,7 +62,7 @@ passport.use('GitHub',
         'User-Agent': 'Shortly-Express'
       }
     }, function (err, res, body) {
-      done(null, body.login);
+      done(null, body);
     });
     // console.log('accessToken', accessToken)
     // console.log('profile', profile);
@@ -82,18 +82,76 @@ app.get('/auth/GitHub/callback',
 
 passport.serializeUser(function(user, done) {
   console.log('serializeUser', user);
-  done(null, user);
+  done(null, JSON.parse(user).login);
 });
 
 passport.deserializeUser(function(user, done) {
   console.log('deserializeUser', user);
-  done(null, user);
+  request({
+    method: 'GET',
+    uri: 'https://api.github.com/users/' + user,
+    headers: {
+      'User-Agent': 'Shortly-Express'
+    }
+  }, function (err, res, body) {
+    console.log('deserialize request body', body)
+    done(null, body);
+  });
+
+
+  // done(null, user);
   // new User({id: id}).fetch()
   //   .then(function (user) {
   //     done(null, user);
   //   });
 });
 
+
+
+
+/*
+
+// Passport authentication path
+
+passport.use(new LocalStrategy(
+  function (username, password, done) {
+    new User({username: username}).fetch()
+      .then(function(user) {
+        if (!user) {
+          return done(null, false, { message: 'Invalid username.' });
+        }
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            return done(null, user);
+          } else {
+            console.log('Invalid password for user', username);
+            return done(null, false, { message: 'Invalid password.' });
+          }
+        });
+      })
+      .catch(function (err) {
+        done(err);
+      });
+  }
+));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser(function(user, done) {
+  done(null, user.get('id'));
+});
+
+passport.deserializeUser(function(id, done) {
+  new User({id: id}).fetch()
+    .then(function (user) {
+      done(null, user);
+    });
+});
+
+
+*/
 
 
 // Handle other stuff
