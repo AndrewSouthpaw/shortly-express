@@ -9,7 +9,7 @@ var Link = require('../app/models/link');
 
 /************************************************************/
 // Mocha doesn't have a way to designate pending before blocks.
-// Mimic the behavior of xit and xdescribe with xbeforeEach.
+// Mimic the behavior of xit and describe with xbeforeEach.
 // Remove the 'x' from beforeEach block when working on
 // authentication tests.
 /************************************************************/
@@ -92,17 +92,18 @@ describe('', function() {
         'uri': 'http://127.0.0.1:4568/links',
         'json': {
           'url': 'definitely not a valid url'
-        }
+        },
       };
 
       requestWithSession(options, function(error, res, body) {
+        console.log(res);
         // res comes from the request module, and may not follow express conventions
         expect(res.statusCode).to.equal(404);
         done();
       });
     });
 
-    xdescribe('Shortening links:', function(){
+    describe('Shortening links:', function(){
 
       var options = {
         'method': 'POST',
@@ -151,7 +152,7 @@ describe('', function() {
 
     }); // 'Shortening links'
 
-    xdescribe('With previously saved urls:', function(){
+    describe('With previously saved urls:', function(){
 
       var link;
 
@@ -214,7 +215,7 @@ describe('', function() {
 
   }); // 'Link creation'
 
-  xdescribe('Priviledged Access:', function(){
+  describe('Priviledged Access:', function(){
 
     it('Redirects to login page if a user tries to access the main page and is not signed in', function(done) {
       request('http://127.0.0.1:4568/', function(error, res, body) {
@@ -239,7 +240,7 @@ describe('', function() {
 
   }); // 'Priviledged Access'
 
-  xdescribe('Password encryption', function() {
+  describe('Password encryption', function() {
     var user;
 
     beforeEach(function (done) {
@@ -276,7 +277,7 @@ describe('', function() {
 
   });
 
-  xdescribe('Account Creation:', function(){
+  describe('Account Creation:', function(){
 
     it('Signup creates a user record', function(done) {
       var options = {

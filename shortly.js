@@ -67,6 +67,7 @@ function(req, res) {
 
 app.post('/links', restrict,
 function(req, res) {
+  console.log('/links reached');
   var uri = req.body.url;
   if (!util.isValidUrl(uri)) {
     return res.send(404);
@@ -110,7 +111,7 @@ function restrict(req, res, next) {
 }
 
 app.get('/login', function(req, res) {
-  res.redirect('/');
+  res.render('login');
 });
 
 app.post('/login', function(req, res) {
@@ -142,6 +143,7 @@ app.post('/login', function(req, res) {
 });
 
 app.post('/signup', function (req, res) {
+  console.log('creating user',req.body)
   new User(req.body).save().then(function() {
     req.session.user = req.body.username;
     res.redirect('/');
