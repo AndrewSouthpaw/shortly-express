@@ -2,9 +2,11 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 
 var db = require('./app/config');
+var bcrypt = require('bcrypt-nodejs');
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
 var Links = require('./app/collections/links');
@@ -12,6 +14,29 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
 var app = express();
+
+
+
+// Set authentication configuration
+
+var sess = {
+  secret: 'top secret',
+  cookie: {},
+  // secret: 'top secret',
+  resave: false,
+  saveUninitialized: true
+};
+
+if (app.get('env') === 'production') {
+  app.set('trust proxy', 1) // trust first proxy
+  sess.cookie.secure = true // serve secure cookies
+}
+
+app.use(session(sess));
+
+
+
+// Handle other stuff
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -23,29 +48,29 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 
-app.get('/', 
+app.get('/', restrict,
+function(req, res) {
+  console.log('/ restricted reached');
+  res.render('index');
+});
+
+app.get('/create', restrict,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/create', 
-function(req, res) {
-  res.render('index');
-});
-
-app.get('/links', 
+app.get('/links', restrict,
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', 
+app.post('/links', restrict,
 function(req, res) {
+  console.log('/links reached');
   var uri = req.body.url;
-
   if (!util.isValidUrl(uri)) {
-    console.log('Not a valid url: ', uri);
     return res.send(404);
   }
 
@@ -78,6 +103,74 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
+function restrict(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+}
+
+app.get('/login', function(req, res) {
+  console.log('/login reached');
+  res.render('login');
+  res.end();
+  // res.send('hello');
+});
+
+app.post('/login', function(req, res) {
+  console.log('/login POST');
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({username: username}).fetch()
+    .then(function(user) {
+      if (user) {
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            req.session.user = username;
+            res.redirect('/');
+          } else {
+            console.log('Invalid password for user', username);
+            res.redirect('/login');
+          }
+        });
+      } else {
+        res.redirect('/login');
+      }
+    });
+});
+
+app.get('/signup', function (req, res) {
+  console.log('/signup reached');
+  res.render('signup');
+
+});
+
+app.post('/signup', function (req, res) {
+  new User({username: req.body.username}).fetch().then(function (user) {
+    if (!user) {
+      new User(req.body).save().then(function() {
+        req.session.user = req.body.username;
+        res.redirect('/');
+      })
+    } else {
+      res.redirect('/signup');
+    }
+  });
+  // new User(req.body).save().then(function() {
+  //   req.session.user = req.body.username;
+  //   res.redirect('/');
+  // })
+});
+
+app.get('/logout', function (req, res) {
+  console.log('/logout reached');
+  req.session.destroy(function() {
+    res.redirect('/login');
+  });
+});
 
 
 /************************************************************/
@@ -87,8 +180,10 @@ function(req, res) {
 /************************************************************/
 
 app.get('/*', function(req, res) {
+  console.log('/* reached for', req.url, 'method', req.method);
   new Link({ code: req.params[0] }).fetch().then(function(link) {
     if (!link) {
+      console.log('redirecting to /');
       res.redirect('/');
     } else {
       var click = new Click({
