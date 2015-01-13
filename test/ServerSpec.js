@@ -59,15 +59,15 @@ describe('', function() {
       });
   });
 
-  describe('Link creation:', function(){
+  xdescribe('Link creation:', function(){
 
     var requestWithSession = request.defaults({jar: true});
 
-    xbeforeEach(function(done){      // create a user that we can then log-in with
+    beforeEach(function(done){      // create a user that we can then log-in with
       new User({
           'username': 'Phillip',
           'password': 'Phillip'
-      }).save().then(function(){
+      }).save().then(function(usr){
         var options = {
           'method': 'POST',
           'followAllRedirects': true,
@@ -81,6 +81,8 @@ describe('', function() {
         requestWithSession(options, function(error, res, body) {
           done();
         });
+      }).catch(function() {
+
       });
     });
 
@@ -100,7 +102,7 @@ describe('', function() {
       });
     });
 
-    describe('Shortening links:', function(){
+    xdescribe('Shortening links:', function(){
 
       var options = {
         'method': 'POST',
@@ -149,7 +151,7 @@ describe('', function() {
 
     }); // 'Shortening links'
 
-    describe('With previously saved urls:', function(){
+    xdescribe('With previously saved urls:', function(){
 
       var link;
 
@@ -212,7 +214,7 @@ describe('', function() {
 
   }); // 'Link creation'
 
-  describe('Priviledged Access:', function(){
+  xdescribe('Priviledged Access:', function(){
 
     it('Redirects to login page if a user tries to access the main page and is not signed in', function(done) {
       request('http://127.0.0.1:4568/', function(error, res, body) {
@@ -236,6 +238,43 @@ describe('', function() {
     });
 
   }); // 'Priviledged Access'
+
+  xdescribe('Password encryption', function() {
+    var user;
+
+    beforeEach(function (done) {
+
+      new User({
+          'username': 'Phillip',
+          'password': 'Phillip'
+      }).save().then(function(usr){
+        user = usr;
+        done();
+      }).catch(function() {
+
+      });
+
+    });
+
+    it('should store hashed password and salt', function (done) {
+      db.knex('users')
+        .where('username', '=', 'Phillip')
+        .then(function (res) {
+          if (res[0] && res[0]['username']) {
+            var password = res[0]['password'];
+            var salt = res[0]['salt'];
+          }
+          expect(password !== 'Phillip').to.equal(true);
+          expect(salt !== undefined).to.equal(true);
+          done();
+        }).catch(function (err) {
+
+        });
+    })
+
+
+
+  });
 
   xdescribe('Account Creation:', function(){
 
@@ -285,7 +324,7 @@ describe('', function() {
 
   }); // 'Account Creation'
 
-  xdescribe('Account Login:', function(){
+  describe('Account Login:', function(){
 
     var requestWithSession = request.defaults({jar: true});
 

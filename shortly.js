@@ -6,6 +6,7 @@ var session = require('express-session');
 
 
 var db = require('./app/config');
+var bcrypt = require('bcrypt-nodejs');
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
 var Links = require('./app/collections/links');
@@ -18,20 +19,20 @@ var app = express();
 
 // Set authentication configuration
 
-// var sess = {
-//   secret: 'top secret',
-//   cookie: {},
-//   // secret: 'top secret',
-//   resave: false,
-//   saveUninitialized: true
-// };
+var sess = {
+  secret: 'top secret',
+  cookie: {},
+  // secret: 'top secret',
+  resave: false,
+  saveUninitialized: true
+};
 
-// if (app.get('env') === 'production') {
-//   app.set('trust proxy', 1) // trust first proxy
-//   sess.cookie.secure = true // serve secure cookies
-// }
+if (app.get('env') === 'production') {
+  app.set('trust proxy', 1) // trust first proxy
+  sess.cookie.secure = true // serve secure cookies
+}
 
-// app.use(session(sess));
+app.use(session(sess));
 
 
 
@@ -101,19 +102,52 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  next();
-  // if (req.session.user) {
-  //   next();
-  // } else {
-  //   console.error('Access restricted. Redirecting to login page.');
-  //   res.redirect('/login');
-  // }
+  if (req.session.user) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
 }
 
-// app.get('/login', function(req, res) {
-//   req.session.user = 'logged in';
-//   res.send('login page');
-// });
+app.get('/login', function(req, res) {
+  res.redirect('/');
+});
+
+app.post('/login', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+
+
+  db.knex('users')
+    .where('username', '=', username)
+    .then(function (result) {
+      if (result[0] && result[0]['username'] === username) {
+        // Hash the provided password with the stored salt and compare
+        bcrypt.hash(password, result[0]['salt'], null, function (err, hash) {
+          if (hash === result[0]['password']) {
+            session.user = username;
+            res.redirect('/');
+          } else {
+            console.log('Invalid password for user', username);
+            res.redirect('/login');
+          }
+        });
+      } else {
+        console.log('Username not found:', username);
+        res.redirect('/login');
+      }
+    }).catch(function () {
+
+    })
+});
+
+app.post('/signup', function (req, res) {
+  new User(req.body).save().then(function() {
+    req.session.user = req.body.username;
+    res.redirect('/');
+  })
+
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
