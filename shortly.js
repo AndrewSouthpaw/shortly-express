@@ -2,8 +2,10 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var cookieParser = require('cookie-parser');
 var session = require('express-session');
-
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
 
 var db = require('./app/config');
 var bcrypt = require('bcrypt-nodejs');
@@ -15,6 +17,9 @@ var Click = require('./app/models/click');
 
 var app = express();
 
+
+// Use cookie parser
+app.use(cookieParser());
 
 
 // Set authentication configuration
@@ -34,6 +39,51 @@ if (app.get('env') === 'production') {
 
 app.use(session(sess));
 
+
+
+
+
+// Passport authentication path
+
+passport.use(new LocalStrategy(
+  function (username, password, done) {
+    new User({username: username}).fetch()
+      .then(function(user) {
+        if (!user) {
+          return done(null, false, { message: 'Invalid username.' });
+        }
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            return done(null, user);
+          } else {
+            console.log('Invalid password for user', username);
+            return done(null, false, { message: 'Invalid password.' });
+          }
+        });
+      })
+      .catch(function (err) {
+        done(err);
+      });
+  }
+));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser(function(user, done) {
+  done(null, user.get('id'));
+});
+
+passport.deserializeUser(function(id, done) {
+  new User({id: id}).fetch()
+    .then(function (user) {
+      done(null, user);
+    });
+});
+
+
+req.user.
 
 
 // Handle other stuff
@@ -104,7 +154,8 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  if (req.session.user) {
+  console.log('req.user.id', req.user.id);
+  if (req.user.id) {
     next();
   } else {
     res.redirect('/login');
@@ -118,29 +169,34 @@ app.get('/login', function(req, res) {
   // res.send('hello');
 });
 
-app.post('/login', function(req, res) {
-  console.log('/login POST');
-  var username = req.body.username;
-  var password = req.body.password;
+app.post('/login', passport.authenticate('local', {
+  successRedirect: '/',
+  failureRedirect: '/login'
+}));
 
-  new User({username: username}).fetch()
-    .then(function(user) {
-      if (user) {
-        user.authenticate(password, function(err, authenticated) {
-          if (authenticated) {
-            console.log('User', username, 'authenticated.');
-            req.session.user = username;
-            res.redirect('/');
-          } else {
-            console.log('Invalid password for user', username);
-            res.redirect('/login');
-          }
-        });
-      } else {
-        res.redirect('/login');
-      }
-    });
-});
+// app.post('/login', function(req, res) {
+//   console.log('/login POST');
+//   var username = req.body.username;
+//   var password = req.body.password;
+
+//   new User({username: username}).fetch()
+//     .then(function(user) {
+//       if (user) {
+//         user.authenticate(password, function(err, authenticated) {
+//           if (authenticated) {
+//             console.log('User', username, 'authenticated.');
+//             req.session.user = username;
+//             res.redirect('/');
+//           } else {
+//             console.log('Invalid password for user', username);
+//             res.redirect('/login');
+//           }
+//         });
+//       } else {
+//         res.redirect('/login');
+//       }
+//     });
+// });
 
 app.get('/signup', function (req, res) {
   console.log('/signup reached');
