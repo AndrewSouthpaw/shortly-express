@@ -4,7 +4,6 @@ window.Shortly = Backbone.View.extend({
   events: {
     'click li a.index':  'renderIndexView',
     'click li a.create': 'renderCreateView',
-    'click li a.test': 'test'
   },
 
   initialize: function(){
@@ -30,13 +29,6 @@ window.Shortly = Backbone.View.extend({
   renderCreateView: function(e){
     e && e.preventDefault();
     this.router.navigate('/create', { trigger: true });
-  },
-
-  test: function(e){
-    e && e.preventDefault();
-    new Shortly.Link({id: 1}).fetch().then(function (model) {
-      console.log(model)
-    })
   },
 
   updateNav: function(routeName){

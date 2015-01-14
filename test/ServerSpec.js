@@ -96,7 +96,6 @@ describe('', function() {
       };
 
       requestWithSession(options, function(error, res, body) {
-        console.log(res);
         // res comes from the request module, and may not follow express conventions
         expect(res.statusCode).to.equal(404);
         done();
