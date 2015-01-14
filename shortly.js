@@ -5,6 +5,7 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
 var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 var request = require('request');
 
@@ -41,6 +42,42 @@ if (app.get('env') === 'production') {
 app.use(session(sess));
 
 
+// Passport authentication path
+
+passport.use(new LocalStrategy(
+  function (username, password, done) {
+    new User({username: username}).fetch()
+      .then(function(user) {
+        if (!user) {
+          return done(null, false, { message: 'Invalid username.' });
+        }
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            return done(null, '{"login": "username"}');
+          } else {
+            console.log('Invalid password for user', username);
+            return done(null, false, { message: 'Invalid password.' });
+          }
+        });
+      })
+      .catch(function (err) {
+        done(err);
+      });
+  }
+));
+
+// passport.serializeUser(function(user, done) {
+//   done(null, user.get('id'));
+// });
+
+// passport.deserializeUser(function(id, done) {
+//   new User({id: id}).fetch()
+//     .then(function (user) {
+//       done(null, user);
+//     });
+// });
+
 
 
 
@@ -64,10 +101,6 @@ passport.use('GitHub',
     }, function (err, res, body) {
       done(null, body);
     });
-    // console.log('accessToken', accessToken)
-    // console.log('profile', profile);
-    // done(null, 'hello');
-
   }
 ));
 
@@ -81,80 +114,16 @@ app.get('/auth/GitHub/callback',
 
 
 passport.serializeUser(function(user, done) {
-  console.log('serializeUser', user);
   done(null, JSON.parse(user).login);
 });
 
 passport.deserializeUser(function(user, done) {
-  console.log('deserializeUser', user);
-
   done(null, JSON.stringify({login: user}));
-
-  // request({
-  //   method: 'GET',
-  //   uri: 'https://api.github.com/users/' + user,
-  //   headers: {
-  //     'User-Agent': 'Shortly-Express'
-  //   }
-  // }, function (err, res, body) {
-  //   // console.log('deserialize request body', body)
-  //   done(null, body);
-  // });
-
-
-  // done(null, user);
-  // new User({id: id}).fetch()
-  //   .then(function (user) {
-  //     done(null, user);
-  //   });
 });
 
 
 
 
-/*
-
-// Passport authentication path
-
-passport.use(new LocalStrategy(
-  function (username, password, done) {
-    new User({username: username}).fetch()
-      .then(function(user) {
-        if (!user) {
-          return done(null, false, { message: 'Invalid username.' });
-        }
-        user.authenticate(password, function(err, authenticated) {
-          if (authenticated) {
-            console.log('User', username, 'authenticated.');
-            return done(null, user);
-          } else {
-            console.log('Invalid password for user', username);
-            return done(null, false, { message: 'Invalid password.' });
-          }
-        });
-      })
-      .catch(function (err) {
-        done(err);
-      });
-  }
-));
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser(function(user, done) {
-  done(null, user.get('id'));
-});
-
-passport.deserializeUser(function(id, done) {
-  new User({id: id}).fetch()
-    .then(function (user) {
-      done(null, user);
-    });
-});
-
-
-*/
 
 
 // Handle other stuff
@@ -171,7 +140,6 @@ app.use(express.static(__dirname + '/public'));
 
 app.get('/', restrict,
 function(req, res) {
-  console.log('/ restricted reached');
   res.render('index');
 });
 
@@ -189,7 +157,6 @@ function(req, res) {
 
 app.post('/links', restrict,
 function(req, res) {
-  console.log('/links reached');
   var uri = req.body.url;
   if (!util.isValidUrl(uri)) {
     return res.send(404);
@@ -220,12 +187,55 @@ function(req, res) {
   });
 });
 
+app.get('/links/:id', restrict,
+function(req, res) {
+  new Link({ id: req.params.id }).fetch().then(function (link) {
+    if (!link) {
+      return res.status(404).json({});
+    }
+    res.json(link);
+  });
+});
+
+app.put('/links/:id', restrict,
+function (req, res) {
+  /* QUESTION: good way to safeguard against garbage being PUT? */
+  new Link(req.body).save().then(function (link) {
+    res.send('Save successful');
+  })
+});
+
+app.get('/pages/:url', restrict,
+function(req, res) {
+  // Fetch link
+  new Link({ url: 'http://' + req.params.url }).fetch().then(function(link) {
+    // If it does not exist, redirect to index
+    if (!link) {
+      res.redirect('/');
+    } else {
+      // Otherwise, track the click, update the visit count, and render the page
+      var click = new Click({
+        link_id: link.get('id')
+      });
+
+      click.save().then(function() {
+        db.knex('urls')
+          .where('url', '=', link.get('url'))
+          .update({
+            visits: link.get('visits') + 1,
+          }).then(function() {
+            return res.render('index');
+          });
+      });
+    }
+  });
+});
+
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
 
 function restrict(req, res, next) {
-  console.log('req.user', req.user);
   if (req.user) {
     next();
   } else {
@@ -234,44 +244,22 @@ function restrict(req, res, next) {
 }
 
 app.get('/login', function(req, res) {
-  console.log('/login reached');
   res.render('login');
   res.end();
-  // res.send('hello');
 });
 
-app.post('/login', function(req, res) {
+app.post('/login',
+  passport.authenticate('local', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
+
+app.get('/github_login', function(req, res) {
   res.redirect('/auth/GitHub');
 });
 
-// app.post('/login', function(req, res) {
-//   console.log('/login POST');
-//   var username = req.body.username;
-//   var password = req.body.password;
-
-//   new User({username: username}).fetch()
-//     .then(function(user) {
-//       if (user) {
-//         user.authenticate(password, function(err, authenticated) {
-//           if (authenticated) {
-//             console.log('User', username, 'authenticated.');
-//             req.session.user = username;
-//             res.redirect('/');
-//           } else {
-//             console.log('Invalid password for user', username);
-//             res.redirect('/login');
-//           }
-//         });
-//       } else {
-//         res.redirect('/login');
-//       }
-//     });
-// });
-
 app.get('/signup', function (req, res) {
-  console.log('/signup reached');
   res.render('signup');
-
 });
 
 app.post('/signup', function (req, res) {
@@ -285,14 +273,9 @@ app.post('/signup', function (req, res) {
       res.redirect('/signup');
     }
   });
-  // new User(req.body).save().then(function() {
-  //   req.session.user = req.body.username;
-  //   res.redirect('/');
-  // })
 });
 
 app.get('/logout', function (req, res) {
-  console.log('/logout reached');
   req.session.destroy(function() {
     res.redirect('/login');
   });
@@ -306,10 +289,8 @@ app.get('/logout', function (req, res) {
 /************************************************************/
 
 app.get('/*', function(req, res) {
-  console.log('/* reached for', req.url, 'method', req.method);
   new Link({ code: req.params[0] }).fetch().then(function(link) {
     if (!link) {
-      console.log('redirecting to /');
       res.redirect('/');
     } else {
       var click = new Click({
