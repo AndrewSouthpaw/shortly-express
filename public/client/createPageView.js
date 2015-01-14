@@ -4,12 +4,12 @@ Shortly.createPageView = Backbone.View.extend({
 
   template:
     _.template(
-      // '<iframe src="<%- url ->" width="500" height="500"></iframe>'
-      '<p>Hello</p>'
+      '<iframe src="<%- "http://" + url %>" width="100%" height="800"></iframe>'
+      // '<p>Hello</p>'
     ),
 
   render: function(){
-    this.$el.html(this.template());
+    this.$el.html(this.template(this.attributes));
     return this;
   }
 
