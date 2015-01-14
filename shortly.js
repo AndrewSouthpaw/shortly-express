@@ -5,6 +5,7 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
 var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 var request = require('request');
 
@@ -40,6 +41,42 @@ if (app.get('env') === 'production') {
 
 app.use(session(sess));
 
+
+// Passport authentication path
+
+passport.use(new LocalStrategy(
+  function (username, password, done) {
+    new User({username: username}).fetch()
+      .then(function(user) {
+        if (!user) {
+          return done(null, false, { message: 'Invalid username.' });
+        }
+        user.authenticate(password, function(err, authenticated) {
+          if (authenticated) {
+            console.log('User', username, 'authenticated.');
+            return done(null, '{"login": "username"}');
+          } else {
+            console.log('Invalid password for user', username);
+            return done(null, false, { message: 'Invalid password.' });
+          }
+        });
+      })
+      .catch(function (err) {
+        done(err);
+      });
+  }
+));
+
+// passport.serializeUser(function(user, done) {
+//   done(null, user.get('id'));
+// });
+
+// passport.deserializeUser(function(id, done) {
+//   new User({id: id}).fetch()
+//     .then(function (user) {
+//       done(null, user);
+//     });
+// });
 
 
 
@@ -211,9 +248,11 @@ app.get('/login', function(req, res) {
   res.end();
 });
 
-app.post('/login', function(req, res) {
-  res.redirect('/auth/GitHub');
-});
+app.post('/login',
+  passport.authenticate('local', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
 
 app.get('/github_login', function(req, res) {
   res.redirect('/auth/GitHub');
