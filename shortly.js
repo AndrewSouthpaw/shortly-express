@@ -221,6 +221,28 @@ function(req, res) {
   });
 });
 
+app.get('/links/:id', restrict,
+function(req, res) {
+  console.log('/links/id reached');
+  new Link({ id: req.params.id }).fetch().then(function (link) {
+    if (!link) {
+      return res.status(404).json({});
+    }
+    res.json(link);
+  });
+});
+
+app.put('/links/:id', restrict,
+function (req, res) {
+  console.log('req.body', req.body);
+  /* QUESTION: good way to safeguard against garbage being PUT? */
+  new Link(req.body).save().then(function (link) {
+    console.log('saved link:', link)
+    console.log('successful save')
+    res.send('Save successful');
+  })
+});
+
 app.get('/pages/:url', restrict,
 function(req, res) {
   // Fetch link
@@ -235,6 +257,7 @@ function(req, res) {
         link_id: link.get('id')
       });
 
+      console.log('saving click', click);
       click.save().then(function() {
         db.knex('urls')
           .where('url', '=', link.get('url'))
@@ -273,30 +296,6 @@ app.get('/login', function(req, res) {
 app.post('/login', function(req, res) {
   res.redirect('/auth/GitHub');
 });
-
-// app.post('/login', function(req, res) {
-//   console.log('/login POST');
-//   var username = req.body.username;
-//   var password = req.body.password;
-
-//   new User({username: username}).fetch()
-//     .then(function(user) {
-//       if (user) {
-//         user.authenticate(password, function(err, authenticated) {
-//           if (authenticated) {
-//             console.log('User', username, 'authenticated.');
-//             req.session.user = username;
-//             res.redirect('/');
-//           } else {
-//             console.log('Invalid password for user', username);
-//             res.redirect('/login');
-//           }
-//         });
-//       } else {
-//         res.redirect('/login');
-//       }
-//     });
-// });
 
 app.get('/signup', function (req, res) {
   console.log('/signup reached');
