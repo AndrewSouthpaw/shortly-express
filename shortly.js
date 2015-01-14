@@ -5,7 +5,8 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
 var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
+var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
+var request = require('request');
 
 var db = require('./app/config');
 var bcrypt = require('bcrypt-nodejs');
@@ -42,6 +43,76 @@ app.use(session(sess));
 
 
 
+
+// Passport authentication path
+
+passport.use('GitHub',
+  new OAuth2Strategy({
+    authorizationURL: 'https://github.com/login/oauth/authorize',
+    tokenURL: 'https://github.com/login/oauth/access_token',
+    clientID: '7ba6eaaaf9bc86989896',
+    clientSecret: 'c9b6cbf3076f818d162db21116d361564cff2950',
+    callbackURL: 'http://127.0.0.1:4568/auth/GitHub/callback'
+  },
+  function (accessToken, refreshToken, profile, done) {
+    request({
+      method: 'GET',
+      uri: 'https://api.github.com/user?access_token=' + accessToken,
+      headers: {
+        'User-Agent': 'Shortly-Express'
+      }
+    }, function (err, res, body) {
+      done(null, body);
+    });
+    // console.log('accessToken', accessToken)
+    // console.log('profile', profile);
+    // done(null, 'hello');
+
+  }
+));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/auth/GitHub', passport.authenticate('GitHub'));
+app.get('/auth/GitHub/callback',
+  passport.authenticate('GitHub', { successRedirect: '/',
+                                    failureRedirect: '/login' }));
+
+
+passport.serializeUser(function(user, done) {
+  console.log('serializeUser', user);
+  done(null, JSON.parse(user).login);
+});
+
+passport.deserializeUser(function(user, done) {
+  console.log('deserializeUser', user);
+
+  done(null, JSON.stringify({login: user}));
+
+  // request({
+  //   method: 'GET',
+  //   uri: 'https://api.github.com/users/' + user,
+  //   headers: {
+  //     'User-Agent': 'Shortly-Express'
+  //   }
+  // }, function (err, res, body) {
+  //   // console.log('deserialize request body', body)
+  //   done(null, body);
+  // });
+
+
+  // done(null, user);
+  // new User({id: id}).fetch()
+  //   .then(function (user) {
+  //     done(null, user);
+  //   });
+});
+
+
+
+
+/*
 
 // Passport authentication path
 
@@ -83,7 +154,7 @@ passport.deserializeUser(function(id, done) {
 });
 
 
-req.user.
+*/
 
 
 // Handle other stuff
@@ -154,8 +225,8 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  console.log('req.user.id', req.user.id);
-  if (req.user.id) {
+  console.log('req.user', req.user);
+  if (req.user) {
     next();
   } else {
     res.redirect('/login');
@@ -169,10 +240,9 @@ app.get('/login', function(req, res) {
   // res.send('hello');
 });
 
-app.post('/login', passport.authenticate('local', {
-  successRedirect: '/',
-  failureRedirect: '/login'
-}));
+app.post('/login', function(req, res) {
+  res.redirect('/auth/GitHub');
+});
 
 // app.post('/login', function(req, res) {
 //   console.log('/login POST');

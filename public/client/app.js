@@ -4,7 +4,6 @@ window.Shortly = Backbone.View.extend({
   events: {
     'click li a.index':  'renderIndexView',
     'click li a.create': 'renderCreateView',
-    // 'click li a.logout': 'logOut'
   },
 
   initialize: function(){
@@ -16,11 +15,6 @@ window.Shortly = Backbone.View.extend({
 
     Backbone.history.start({ pushState: true });
   },
-
-  // logOut: function(e){
-  //   e && e.preventDefault();
-  //   this.router.navigate('/logout', { trigger: true })
-  // },
 
   render: function(){
     this.$el.html( this.template() );
