@@ -215,6 +215,10 @@ app.post('/login', function(req, res) {
   res.redirect('/auth/GitHub');
 });
 
+app.get('/github_login', function(req, res) {
+  res.redirect('/auth/GitHub');
+});
+
 app.get('/signup', function (req, res) {
   res.render('signup');
 });
