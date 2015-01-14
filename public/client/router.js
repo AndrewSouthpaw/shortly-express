@@ -33,6 +33,8 @@ Shortly.Router = Backbone.Router.extend({
   //   console.log('page', page)
   page: function(url){
     console.log('hello, url:', url)
-    // this.swapView(new Shortly.createPageView());
+    this.swapView(new Shortly.createPageView({
+      attributes: { url: url }
+    }));
   },
 });
