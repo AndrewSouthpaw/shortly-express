@@ -177,6 +177,7 @@ function(req, res) {
 
 app.get('/create', restrict,
 function(req, res) {
+  console.log('/create reached');
   res.render('index');
 });
 
@@ -218,6 +219,13 @@ function(req, res) {
       });
     }
   });
+});
+
+app.get('/pages/:url', restrict,
+function(req, res) {
+  console.log('/pages/', req.params.url, 'reached')
+  res.render('index');
+
 });
 
 /************************************************************/
