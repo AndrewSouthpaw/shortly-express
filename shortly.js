@@ -223,9 +223,29 @@ function(req, res) {
 
 app.get('/pages/:url', restrict,
 function(req, res) {
-  console.log('/pages/', req.params.url, 'reached')
-  res.render('index');
+  // Fetch link
+  new Link({ url: 'http://' + req.params.url }).fetch().then(function(link) {
+    // If it does not exist, redirect to index
+    if (!link) {
+      console.log('redirecting to /');
+      res.redirect('/');
+    } else {
+      // Otherwise, track the click, update the visit count, and render the page
+      var click = new Click({
+        link_id: link.get('id')
+      });
 
+      click.save().then(function() {
+        db.knex('urls')
+          .where('url', '=', link.get('url'))
+          .update({
+            visits: link.get('visits') + 1,
+          }).then(function() {
+            return res.render('index');
+          });
+      });
+    }
+  });
 });
 
 /************************************************************/
@@ -233,8 +253,8 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  // DEBUG always log in
-  req.user = true;
+  // // DEBUG always log in
+  // req.user = true;
   console.log('req.user', req.user);
   if (req.user) {
     next();
