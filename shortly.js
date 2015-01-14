@@ -225,6 +225,8 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
+  // DEBUG always log in
+  req.user = true;
   console.log('req.user', req.user);
   if (req.user) {
     next();
