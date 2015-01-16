@@ -52,6 +52,20 @@ h1 {
   background-color: #ccc;
 }
 
+.navigation .user {
+  float: right;
+}
+
+.navigation .user img {
+  max-width: 40px;
+}
+
+.navigation .user span {
+  margin: 10px 10px;
+  position: relative;
+  top: -12px;
+}
+
 #container {
   clear: both;
   margin-top: 10px;

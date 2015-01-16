@@ -324,6 +324,9 @@ app.get('/logout', function (req, res) {
   });
 });
 
+app.get('/userSession', function (req, res) {
+  res.send(req.user);
+})
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
