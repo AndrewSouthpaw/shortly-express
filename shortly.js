@@ -7,6 +7,8 @@ var session = require('express-session');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+var keys = require('./config');
 var request = require('request');
 
 var db = require('./app/config');
@@ -41,6 +43,9 @@ if (app.get('env') === 'production') {
 
 app.use(session(sess));
 
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Passport authentication path
 
@@ -87,9 +92,9 @@ passport.use('GitHub',
   new OAuth2Strategy({
     authorizationURL: 'https://github.com/login/oauth/authorize',
     tokenURL: 'https://github.com/login/oauth/access_token',
-    clientID: '7ba6eaaaf9bc86989896',
-    clientSecret: 'c9b6cbf3076f818d162db21116d361564cff2950',
-    callbackURL: 'http://127.0.0.1:4568/auth/GitHub/callback'
+    clientID: keys.GITHUB_CLIENT_ID,
+    clientSecret: keys.GITHUB_CLIENT_SECRET,
+    callbackURL: 'http://localhost:4568/auth/GitHub/callback'
   },
   function (accessToken, refreshToken, profile, done) {
     request({
@@ -104,20 +109,44 @@ passport.use('GitHub',
   }
 ));
 
-app.use(passport.initialize());
-app.use(passport.session());
-
 app.get('/auth/GitHub', passport.authenticate('GitHub'));
 app.get('/auth/GitHub/callback',
   passport.authenticate('GitHub', { successRedirect: '/',
                                     failureRedirect: '/login' }));
 
 
+passport.use(new GoogleStrategy({
+    clientID: keys.GOOGLE_CLIENT_ID,
+    clientSecret: keys.GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:4568/auth/google/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+    done(err, '{"login": "google user"}')
+  }
+));
+
+app.get('/auth/google',
+  passport.authenticate('google'));
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect('/');
+  });
+
+
+
+
+
+
 passport.serializeUser(function(user, done) {
+  console.log('Serializing user:', user)
   done(null, JSON.parse(user).login);
 });
 
 passport.deserializeUser(function(user, done) {
+  console.log('Deserializing user', user)
   done(null, JSON.stringify({login: user}));
 });
 
@@ -236,7 +265,7 @@ function(req, res) {
 /************************************************************/
 
 function restrict(req, res, next) {
-  if (req.user) {
+  if (req.isAuthenticated()) {
     next();
   } else {
     res.redirect('/login');
@@ -244,6 +273,7 @@ function restrict(req, res, next) {
 }
 
 app.get('/login', function(req, res) {
+  console.log(keys);
   res.render('login');
   res.end();
 });
@@ -254,9 +284,21 @@ app.post('/login',
     failureRedirect: '/login'
   }));
 
-app.get('/github_login', function(req, res) {
-  res.redirect('/auth/GitHub');
-});
+// app.get('/github_login', function(req, res) {
+//   res.redirect('/auth/GitHub');
+// });
+
+// app.post('/google_auth', function(req, res) {
+//   console.log('message posted')
+//   var authResult = JSON.stringify(req.body.authResult);
+//   if (authResult.status.signed_in) {
+//     req.login('{"login":"google user"}', function(err) {
+//       if (err) { return next(err); }
+//       return res.redirect('/');
+//     });
+//   }
+//   res.send('hello')
+// });
 
 app.get('/signup', function (req, res) {
   res.render('signup');
