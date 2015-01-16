@@ -121,12 +121,13 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:4568/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, done) {
-    done(err, '{"login": "google user"}')
+    done(null, '{"login": "google user"}')
   }
 ));
 
 app.get('/auth/google',
-  passport.authenticate('google'));
+  passport.authenticate('google',  { scope: ['https://www.googleapis.com/auth/userinfo.profile',
+                                            'https://www.googleapis.com/auth/userinfo.email'] }));
 
 app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -273,7 +274,6 @@ function restrict(req, res, next) {
 }
 
 app.get('/login', function(req, res) {
-  console.log(keys);
   res.render('login');
   res.end();
 });
