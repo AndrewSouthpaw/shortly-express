@@ -49,7 +49,7 @@ app.use(passport.session());
 
 // Passport authentication path
 
-passport.use(new LocalStrategy(
+passport.use('local-login', new LocalStrategy(
   function (username, password, done) {
     new User({username: username}).fetch()
       .then(function(user) {
@@ -59,7 +59,11 @@ passport.use(new LocalStrategy(
         user.authenticate(password, function(err, authenticated) {
           if (authenticated) {
             console.log('User', username, 'authenticated.');
-            return done(null, '{"login": "username"}');
+            var userObj = {
+              username: username,
+              imageUrl: ''
+            }
+            return done(null, userObj);
           } else {
             console.log('Invalid password for user', username);
             return done(null, false, { message: 'Invalid password.' });
@@ -72,19 +76,28 @@ passport.use(new LocalStrategy(
   }
 ));
 
-// passport.serializeUser(function(user, done) {
-//   done(null, user.get('id'));
-// });
-
-// passport.deserializeUser(function(id, done) {
-//   new User({id: id}).fetch()
-//     .then(function (user) {
-//       done(null, user);
-//     });
-// });
-
-
-
+passport.use('local-signup', new LocalStrategy(
+  // {passReqToCallback : true}, //allows us to pass back the request to the callback
+  // function (req, username, password, done) {
+  function (username, password, done) {
+    new User({username: username}).fetch().then(function (user) {
+      if (!user) {
+        new User({username: username, password: password})
+          .save().then(function (user) {
+            console.log('Registered:', username);
+            var userObj = {
+              username: user.get('username'),
+              imageUrl: ''
+            }
+            return done(null, userObj);
+          });
+      } else {
+        console.log('Could not register', username);
+        return done(null, false, { message: 'Username already exists.' });
+      }
+    });
+  }
+));
 
 // Passport authentication path
 
@@ -104,7 +117,14 @@ passport.use('GitHub',
         'User-Agent': 'Shortly-Express'
       }
     }, function (err, res, body) {
-      done(null, body);
+      // Extract username and image URL
+      body = JSON.parse(body);
+      var user = {
+        username: body.login,
+        imageUrl: body.avatar_url
+      };
+
+      done(null, user);
     });
   }
 ));
@@ -121,7 +141,11 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:4568/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, done) {
-    done(null, '{"login": "google user"}')
+    var user = {
+      username: profile.displayName,
+      imageUrl: profile._json.picture
+    }
+    done(null, user);
   }
 ));
 
@@ -143,12 +167,12 @@ app.get('/auth/google/callback',
 
 passport.serializeUser(function(user, done) {
   console.log('Serializing user:', user)
-  done(null, JSON.parse(user).login);
+  done(null, user);
 });
 
-passport.deserializeUser(function(user, done) {
-  console.log('Deserializing user', user)
-  done(null, JSON.stringify({login: user}));
+passport.deserializeUser(function(obj, done) {
+  console.log('Deserializing user', obj)
+  done(null, obj);
 });
 
 
@@ -279,43 +303,20 @@ app.get('/login', function(req, res) {
 });
 
 app.post('/login',
-  passport.authenticate('local', {
+  passport.authenticate('local-login', {
     successRedirect: '/',
     failureRedirect: '/login'
   }));
-
-// app.get('/github_login', function(req, res) {
-//   res.redirect('/auth/GitHub');
-// });
-
-// app.post('/google_auth', function(req, res) {
-//   console.log('message posted')
-//   var authResult = JSON.stringify(req.body.authResult);
-//   if (authResult.status.signed_in) {
-//     req.login('{"login":"google user"}', function(err) {
-//       if (err) { return next(err); }
-//       return res.redirect('/');
-//     });
-//   }
-//   res.send('hello')
-// });
 
 app.get('/signup', function (req, res) {
   res.render('signup');
 });
 
-app.post('/signup', function (req, res) {
-  new User({username: req.body.username}).fetch().then(function (user) {
-    if (!user) {
-      new User(req.body).save().then(function() {
-        req.session.user = req.body.username;
-        res.redirect('/');
-      })
-    } else {
-      res.redirect('/signup');
-    }
-  });
-});
+app.post('/signup',
+  passport.authenticate('local-signup', {
+    successRedirect: '/',
+    failureRedirect: '/signup'
+  }));
 
 app.get('/logout', function (req, res) {
   req.session.destroy(function() {
