@@ -1,54 +1,67 @@
 var express = require('express');
+var app = express();
+
 var util = require('./lib/utility');
+var request = require('request');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
+
+// Passport modules
+var keys = require('./config');
 var session = require('express-session');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
-var keys = require('./config');
-var request = require('request');
 
+// Database module, models, and collections
 var db = require('./app/config');
-var bcrypt = require('bcrypt-nodejs');
-var Users = require('./app/collections/users');
 var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
-var app = express();
 
 
-// Use cookie parser
-app.use(cookieParser());
+/******************************************************************************
+ * Express Middleware
+ *****************************************************************************/
+
+app.set('views', __dirname + '/views');
+app.set('view engine', 'ejs');
+app.use(partials());
+// Parse JSON (uniform resource locators)
+app.use(bodyParser.json());
+// Parse forms (signup/login)
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(__dirname + '/public'));
 
 
-// Set authentication configuration
+/******************************************************************************
+ * Passport Middleware
+ *****************************************************************************/
 
+// Session storage
 var sess = {
   secret: 'top secret',
   cookie: {},
-  // secret: 'top secret',
   resave: false,
   saveUninitialized: true
 };
 
-if (app.get('env') === 'production') {
-  app.set('trust proxy', 1) // trust first proxy
-  sess.cookie.secure = true // serve secure cookies
-}
-
+app.use(cookieParser());
 app.use(session(sess));
-
-
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport authentication path
 
+
+/******************************************************************************
+ * Passport Authentication Strategies
+ *****************************************************************************/
+
+// Local Login
 passport.use('local-login', new LocalStrategy(
   function (username, password, done) {
     new User({username: username}).fetch()
@@ -76,10 +89,10 @@ passport.use('local-login', new LocalStrategy(
   }
 ));
 
+// Local Signup
 passport.use('local-signup', new LocalStrategy(
-  // {passReqToCallback : true}, //allows us to pass back the request to the callback
-  // function (req, username, password, done) {
   function (username, password, done) {
+    console.log('local-signup')
     new User({username: username}).fetch().then(function (user) {
       if (!user) {
         new User({username: username, password: password})
@@ -99,8 +112,7 @@ passport.use('local-signup', new LocalStrategy(
   }
 ));
 
-// Passport authentication path
-
+// GitHub
 passport.use('GitHub',
   new OAuth2Strategy({
     authorizationURL: 'https://github.com/login/oauth/authorize',
@@ -129,12 +141,8 @@ passport.use('GitHub',
   }
 ));
 
-app.get('/auth/GitHub', passport.authenticate('GitHub'));
-app.get('/auth/GitHub/callback',
-  passport.authenticate('GitHub', { successRedirect: '/',
-                                    failureRedirect: '/login' }));
 
-
+// Google
 passport.use(new GoogleStrategy({
     clientID: keys.GOOGLE_CLIENT_ID,
     clientSecret: keys.GOOGLE_CLIENT_SECRET,
@@ -149,21 +157,10 @@ passport.use(new GoogleStrategy({
   }
 ));
 
-app.get('/auth/google',
-  passport.authenticate('google',  { scope: ['https://www.googleapis.com/auth/userinfo.profile',
-                                            'https://www.googleapis.com/auth/userinfo.email'] }));
 
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  function(req, res) {
-    // Successful authentication, redirect home.
-    res.redirect('/');
-  });
-
-
-
-
-
+/******************************************************************************
+ * Passport User Serialization
+ *****************************************************************************/
 
 passport.serializeUser(function(user, done) {
   console.log('Serializing user:', user)
@@ -176,21 +173,67 @@ passport.deserializeUser(function(obj, done) {
 });
 
 
+/******************************************************************************
+ * Passport Authentication Routes
+ *****************************************************************************/
+
+// Local Login
+app.post('/login',
+  passport.authenticate('local-login', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
+
+// Local Signup
+app.post('/signup',
+  passport.authenticate('local-signup', {
+    successRedirect: '/',
+    failureRedirect: '/signup'
+  }));
+
+// GitHub
+app.get('/auth/GitHub', passport.authenticate('GitHub'));
+app.get('/auth/GitHub/callback',
+  passport.authenticate('GitHub', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
+
+// Google
+app.get('/auth/google',
+  passport.authenticate('google',  {
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email'
+    ]
+  }));
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    res.redirect('/');
+  });
+
+
+
+/******************************************************************************
+ * Restricted Access Middleware
+ *****************************************************************************/
+
+function restrict(req, res, next) {
+  if (req.isAuthenticated()) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+}
 
 
 
 
-// Handle other stuff
 
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
-app.use(partials());
-// Parse JSON (uniform resource locators)
-app.use(bodyParser.json());
-// Parse forms (signup/login)
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(__dirname + '/public'));
-
+/******************************************************************************
+ * Express Routes
+ *****************************************************************************/
 
 app.get('/', restrict,
 function(req, res) {
@@ -253,7 +296,6 @@ function(req, res) {
 
 app.put('/links/:id', restrict,
 function (req, res) {
-  /* QUESTION: good way to safeguard against garbage being PUT? */
   new Link(req.body).save().then(function (link) {
     res.send('Save successful');
   })
@@ -285,38 +327,15 @@ function(req, res) {
   });
 });
 
-/************************************************************/
-// Write your authentication routes here
-/************************************************************/
-
-function restrict(req, res, next) {
-  if (req.isAuthenticated()) {
-    next();
-  } else {
-    res.redirect('/login');
-  }
-}
-
 app.get('/login', function(req, res) {
   res.render('login');
   res.end();
 });
 
-app.post('/login',
-  passport.authenticate('local-login', {
-    successRedirect: '/',
-    failureRedirect: '/login'
-  }));
 
 app.get('/signup', function (req, res) {
   res.render('signup');
 });
-
-app.post('/signup',
-  passport.authenticate('local-signup', {
-    successRedirect: '/',
-    failureRedirect: '/signup'
-  }));
 
 app.get('/logout', function (req, res) {
   req.session.destroy(function() {
@@ -327,12 +346,6 @@ app.get('/logout', function (req, res) {
 app.get('/userSession', function (req, res) {
   res.send(req.user);
 })
-
-/************************************************************/
-// Handle the wildcard route last - if all other routes fail
-// assume the route is a short code and try and handle it here.
-// If the short-code doesn't exist, send the user to '/'
-/************************************************************/
 
 app.get('/*', function(req, res) {
   new Link({ code: req.params[0] }).fetch().then(function(link) {
