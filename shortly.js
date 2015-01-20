@@ -1,50 +1,68 @@
 var express = require('express');
+var app = express();
+
 var util = require('./lib/utility');
+var request = require('request');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
+
+// Passport modules
+var keys = require('./config');
 var session = require('express-session');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
-var request = require('request');
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
+// Database module, models, and collections
 var db = require('./app/config');
-var bcrypt = require('bcrypt-nodejs');
-var Users = require('./app/collections/users');
 var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
-var app = express();
 
 
-// Use cookie parser
-app.use(cookieParser());
+/******************************************************************************
+ * Express Middleware
+ *****************************************************************************/
+
+app.set('views', __dirname + '/views');
+app.set('view engine', 'ejs');
+app.use(partials());
+// Parse JSON (uniform resource locators)
+app.use(bodyParser.json());
+// Parse forms (signup/login)
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(__dirname + '/public'));
 
 
-// Set authentication configuration
+/******************************************************************************
+ * Passport Middleware
+ *****************************************************************************/
 
+// Session storage
 var sess = {
   secret: 'top secret',
   cookie: {},
-  // secret: 'top secret',
   resave: false,
   saveUninitialized: true
 };
 
-if (app.get('env') === 'production') {
-  app.set('trust proxy', 1) // trust first proxy
-  sess.cookie.secure = true // serve secure cookies
-}
-
+app.use(cookieParser());
 app.use(session(sess));
+app.use(passport.initialize());
+app.use(passport.session());
 
 
-// Passport authentication path
 
-passport.use(new LocalStrategy(
+/******************************************************************************
+ * Passport Authentication Strategies
+ *****************************************************************************/
+
+// Local Login
+passport.use('local-login', new LocalStrategy(
   function (username, password, done) {
     new User({username: username}).fetch()
       .then(function(user) {
@@ -54,7 +72,11 @@ passport.use(new LocalStrategy(
         user.authenticate(password, function(err, authenticated) {
           if (authenticated) {
             console.log('User', username, 'authenticated.');
-            return done(null, '{"login": "username"}');
+            var userObj = {
+              username: username,
+              imageUrl: ''
+            }
+            return done(null, userObj);
           } else {
             console.log('Invalid password for user', username);
             return done(null, false, { message: 'Invalid password.' });
@@ -67,29 +89,37 @@ passport.use(new LocalStrategy(
   }
 ));
 
-// passport.serializeUser(function(user, done) {
-//   done(null, user.get('id'));
-// });
+// Local Signup
+passport.use('local-signup', new LocalStrategy(
+  function (username, password, done) {
+    console.log('local-signup')
+    new User({username: username}).fetch().then(function (user) {
+      if (!user) {
+        new User({username: username, password: password})
+          .save().then(function (user) {
+            console.log('Registered:', username);
+            var userObj = {
+              username: user.get('username'),
+              imageUrl: ''
+            }
+            return done(null, userObj);
+          });
+      } else {
+        console.log('Could not register', username);
+        return done(null, false, { message: 'Username already exists.' });
+      }
+    });
+  }
+));
 
-// passport.deserializeUser(function(id, done) {
-//   new User({id: id}).fetch()
-//     .then(function (user) {
-//       done(null, user);
-//     });
-// });
-
-
-
-
-// Passport authentication path
-
+// GitHub
 passport.use('GitHub',
   new OAuth2Strategy({
     authorizationURL: 'https://github.com/login/oauth/authorize',
     tokenURL: 'https://github.com/login/oauth/access_token',
-    clientID: '7ba6eaaaf9bc86989896',
-    clientSecret: 'c9b6cbf3076f818d162db21116d361564cff2950',
-    callbackURL: 'http://127.0.0.1:4568/auth/GitHub/callback'
+    clientID: keys.GITHUB_CLIENT_ID,
+    clientSecret: keys.GITHUB_CLIENT_SECRET,
+    callbackURL: 'http://localhost:4568/auth/GitHub/callback'
   },
   function (accessToken, refreshToken, profile, done) {
     request({
@@ -99,44 +129,111 @@ passport.use('GitHub',
         'User-Agent': 'Shortly-Express'
       }
     }, function (err, res, body) {
-      done(null, body);
+      // Extract username and image URL
+      body = JSON.parse(body);
+      var user = {
+        username: body.login,
+        imageUrl: body.avatar_url
+      };
+
+      done(null, user);
     });
   }
 ));
 
-app.use(passport.initialize());
-app.use(passport.session());
 
-app.get('/auth/GitHub', passport.authenticate('GitHub'));
-app.get('/auth/GitHub/callback',
-  passport.authenticate('GitHub', { successRedirect: '/',
-                                    failureRedirect: '/login' }));
+// Google
+passport.use(new GoogleStrategy({
+    clientID: keys.GOOGLE_CLIENT_ID,
+    clientSecret: keys.GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:4568/auth/google/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+    var user = {
+      username: profile.displayName,
+      imageUrl: profile._json.picture
+    }
+    done(null, user);
+  }
+));
 
+
+/******************************************************************************
+ * Passport User Serialization
+ *****************************************************************************/
 
 passport.serializeUser(function(user, done) {
-  done(null, JSON.parse(user).login);
+  console.log('Serializing user:', user)
+  done(null, user);
 });
 
-passport.deserializeUser(function(user, done) {
-  done(null, JSON.stringify({login: user}));
+passport.deserializeUser(function(obj, done) {
+  console.log('Deserializing user', obj)
+  done(null, obj);
 });
 
 
+/******************************************************************************
+ * Passport Authentication Routes
+ *****************************************************************************/
+
+// Local Login
+app.post('/login',
+  passport.authenticate('local-login', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
+
+// Local Signup
+app.post('/signup',
+  passport.authenticate('local-signup', {
+    successRedirect: '/',
+    failureRedirect: '/signup'
+  }));
+
+// GitHub
+app.get('/auth/GitHub', passport.authenticate('GitHub'));
+app.get('/auth/GitHub/callback',
+  passport.authenticate('GitHub', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  }));
+
+// Google
+app.get('/auth/google',
+  passport.authenticate('google',  {
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email'
+    ]
+  }));
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    res.redirect('/');
+  });
+
+
+
+/******************************************************************************
+ * Restricted Access Middleware
+ *****************************************************************************/
+
+function restrict(req, res, next) {
+  if (req.isAuthenticated()) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+}
 
 
 
 
-// Handle other stuff
 
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
-app.use(partials());
-// Parse JSON (uniform resource locators)
-app.use(bodyParser.json());
-// Parse forms (signup/login)
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(__dirname + '/public'));
-
+/******************************************************************************
+ * Express Routes
+ *****************************************************************************/
 
 app.get('/', restrict,
 function(req, res) {
@@ -199,7 +296,6 @@ function(req, res) {
 
 app.put('/links/:id', restrict,
 function (req, res) {
-  /* QUESTION: good way to safeguard against garbage being PUT? */
   new Link(req.body).save().then(function (link) {
     res.send('Save successful');
   })
@@ -231,48 +327,14 @@ function(req, res) {
   });
 });
 
-/************************************************************/
-// Write your authentication routes here
-/************************************************************/
-
-function restrict(req, res, next) {
-  if (req.user) {
-    next();
-  } else {
-    res.redirect('/login');
-  }
-}
-
 app.get('/login', function(req, res) {
   res.render('login');
   res.end();
 });
 
-app.post('/login',
-  passport.authenticate('local', {
-    successRedirect: '/',
-    failureRedirect: '/login'
-  }));
-
-app.get('/github_login', function(req, res) {
-  res.redirect('/auth/GitHub');
-});
 
 app.get('/signup', function (req, res) {
   res.render('signup');
-});
-
-app.post('/signup', function (req, res) {
-  new User({username: req.body.username}).fetch().then(function (user) {
-    if (!user) {
-      new User(req.body).save().then(function() {
-        req.session.user = req.body.username;
-        res.redirect('/');
-      })
-    } else {
-      res.redirect('/signup');
-    }
-  });
 });
 
 app.get('/logout', function (req, res) {
@@ -281,12 +343,9 @@ app.get('/logout', function (req, res) {
   });
 });
 
-
-/************************************************************/
-// Handle the wildcard route last - if all other routes fail
-// assume the route is a short code and try and handle it here.
-// If the short-code doesn't exist, send the user to '/'
-/************************************************************/
+app.get('/userSession', function (req, res) {
+  res.send(req.user);
+})
 
 app.get('/*', function(req, res) {
   new Link({ code: req.params[0] }).fetch().then(function(link) {

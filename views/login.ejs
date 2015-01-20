@@ -1,3 +1,4 @@
+<!-- <script src="https://apis.google.com/js/client:platform.js" async defer></script> -->
 <h2>Login</h2>
 <form action="/login" method="post">
     <div>
@@ -17,4 +18,83 @@
 <p>
 
 <h2>Or Login With</h2>
-<a href='/github_login'><img src="/Github_logo.jpg" class="login"></a>
+<a href='/auth/google'><img src="/google_signin.png" class="login"></a>
+<a href='/auth/GitHub'><img src="/github_signin.png" class="login"></a>
+<!--<span id="signinButton">
+  <span
+    class="g-signin"
+    data-callback="signinCallback"
+    data-clientid="200469340960-hp9rvtpr3hudu7f2m1vdim9eh2j72tdj.apps.googleusercontent.com"
+    data-cookiepolicy="single_host_origin"
+    data-scope="profile">
+  </span>
+</span>
+
+<script>
+  function signinCallback(authResult) {
+    if (authResult['status']['signed_in']) {
+      console.log('logged in with google')
+      // $.ajax({
+      //   url: '/google_auth',
+      //   method: 'POST',
+      //   data: JSON.stringify({authResult: authResult})
+      // }).done(function (data) {
+      //   console.log(data);
+      // });
+      // Update the app to reflect a signed in user
+      // Hide the sign-in button now that the user is authorized, for example:
+    } else {
+      // Update the app to reflect a signed out user
+      // Possible error values:
+      //   "user_signed_out" - User is signed-out
+      //   "access_denied" - User denied access to your app
+      //   "immediate_failed" - Could not automatically log in the user
+      console.log('Sign-in state: ' + authResult['error']);
+    }
+  }
+</script>-->
+
+
+<!--<a href='#'><img src="/Github_logo.jpg" class="login"></a>
+<button class="getGitHub">test</button>
+<button class="getGitHubUsername">get name</button>
+<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>-->
+<!--<script>
+  //  old code for client authentication with github
+  $(document).ready(function() {
+
+    var token;
+
+    $('img.login').click(function (e){
+      e.preventDefault();
+      window.location = 'https://github.com/login/oauth/authorize?client_id=7ba6eaaaf9bc86989896';
+    });
+
+    $('button.getGitHub').click(function (){
+      var code = window.location.href.match(/\?code=(.*)/)[1];
+      $.getJSON('http://localhost:9999/authenticate/'+code, function(data) {
+        console.log('token',data.token);
+        token = data.token;
+      });
+    })
+
+    $('button.getGitHubUsername').click(function (){
+      $.ajax({
+        method: 'GET',
+        url: 'https://api.github.com/user?access_token=' + token,
+        // headers: {
+        //   'User-Agent': 'Shortly-Express'
+        // }
+      })
+        .done(function (err, res, body) {
+          console.log(body);
+        });
+    });
+
+  });
+
+  // var code = window.location.href.match(/\?code=(.*)/)[1];
+  // $.getJSON('http://localhost:9999/authenticate/'+code, function(data) {
+  //   console.log(data.token);
+  // });
+</script>-->

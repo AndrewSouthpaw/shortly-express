@@ -1,10 +1,11 @@
 <script id='layout' type='text/x-handlebars-template'>
   <div class='navigation'>
-  <ul>
-    <li><a href='#' class='index'>All Links</a></li>
-    <li><a href='#' class='create'>Shorten</a></li>
-    <li><a href='/logout' class='logout'>Log Out</a></li>
-  </ul>
+    <ul>
+      <li><a href='#' class='index'>All Links</a></li>
+      <li><a href='#' class='create'>Shorten</a></li>
+      <li><a href='/logout' class='logout'>Log Out</a></li>
+    </ul>
+    <div class="user"><span>{{username}}</span><img src='{{imageUrl}}'></img></div>
   </div>
   <div id='container'></div>
 </script>
@@ -32,7 +33,10 @@
 
 <script>
   $(function(){
-    new Shortly();
+    $.ajax('/userSession').done(function (data) {
+      console.log(data);
+      new Shortly({model: new Shortly.User(data)});
+    });
   });
 
   window.Templates = {};
@@ -42,6 +46,7 @@
 </script>
 
 <script src='/client/app.js'></script>
+<script src='/client/user.js'></script>
 <script src='/client/link.js'></script>
 <script src='/client/links.js'></script>
 <script src='/client/linkView.js'></script>
