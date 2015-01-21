@@ -14,15 +14,17 @@ While my project did come with starter code and scaffolding, I have touched or m
 
 ## Back-End
 
-* Node
 * Express
 * Passport
 * GitHub OAuth2 Authentication
 * Google OAuth2 Server-Side Authentication
+* MySQL
+* Bookshelf / Knex
 
 ## Automation
 
 * Grunt
+* Git Flow
 
 ## Testing
 
